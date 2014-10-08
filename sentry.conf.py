@@ -25,6 +25,8 @@ if 'postgres' in DATABASES['default']['ENGINE']:
 
 CACHES = {'default': django_cache_url.config() }
 
+SESSION_SERIALIZER = 'django.contrib.sessions.serializers.JSONSerializer'
+
 ###########
 # Queue ##
 ###########
