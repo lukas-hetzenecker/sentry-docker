@@ -27,9 +27,9 @@ CACHES = {'default': django_cache_url.config() }
 
 SESSION_SERIALIZER = 'django.contrib.sessions.serializers.JSONSerializer'
 
-INSTALLED_APPS += [
-    'sentry_hipchat'
-]
+INSTALLED_APPS += (
+    'sentry_hipchat',
+)
 
 ###########
 # Queue ##
