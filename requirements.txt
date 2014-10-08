@@ -15,3 +15,4 @@ django-auth-ldap==1.2.1
 
 # sentry
 sentry[postgres]==6.4.4
+-e git+https://github.com/linovia/sentry-hipchat.git@2926bea1b3e4dfaeac466ad179a013216ab54e19#egg=sentry-hipchat
