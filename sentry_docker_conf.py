@@ -85,8 +85,8 @@ SENTRY_URL_PREFIX = config('SENTRY_URL_PREFIX')  # No trailing slash!
 
 # If you're using a reverse proxy, you should enable the X-Forwarded-Proto
 # and X-Forwarded-Host headers, and uncomment the following settings
-# SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-# USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = config('SENTRY_SECURE_PROXY_SSL_HEADER', default=None, cast=lambda x: tuple(x.split(',')) if x else None)
+USE_X_FORWARDED_HOST = config('SENTRY_USE_X_FORWARDED_HOST', default=False, cast=bool)
 
 SENTRY_WEB_HOST = config('SENTRY_WEB_HOST', default='0.0.0.0')
 SENTRY_WEB_PORT = config('SENTRY_WEB_PORT', default=9000, cast=int)
@@ -97,6 +97,9 @@ SENTRY_WEB_OPTIONS = {
     'errorlog' : os.path.join(DATA_DIR, 'gunicorn_error.log'),
     'accesslog' : os.path.join(DATA_DIR, 'gunicorn_access.log'),
 }
+
+# allows JavaScript clients to submit cross-domain error reports. Useful for local development
+SENTRY_ALLOW_ORIGIN = config('SENTRY_ALLOW_ORIGIN', default=None)
 
 #################
 # Mail Server ##
@@ -120,7 +123,7 @@ SERVER_EMAIL = config('SENTRY_SERVER_EMAIL', default='root@localhost')
 # etc. ##
 ###########
 
-SENTRY_ALLOW_REGISTRATION = config('SENTRY_ALLOW_REGISTRATION', default=True, cast=bool)
+SENTRY_ALLOW_REGISTRATION = config('SENTRY_ALLOW_REGISTRATION', default=False, cast=bool)
 
 # If this file ever becomes compromised, it's important to regenerate your SECRET_KEY
 # Changing this value will result in all current sessions being invalidated
@@ -155,6 +158,13 @@ BITBUCKET_CONSUMER_SECRET = config('BITBUCKET_CONSUMER_SECRET', default='')
 ALLOWED_HOSTS = ['*']
 LOGGING['disable_existing_loggers'] = False
 
+SENTRY_BEACON = config('SENTRY_BEACON', default=True, cast=bool)
+SENTRY_ADMIN_EMAIL = config('SENTRY_ADMIN_EMAIL', default='root@localhost')
+
+####################
+# LDAP settings ##
+####################
+
 SENTRY_USE_LDAP = config('SENTRY_USE_LDAP', default=False, cast=bool)
 
 if SENTRY_USE_LDAP:
@@ -169,33 +179,49 @@ if SENTRY_USE_LDAP:
     AUTH_LDAP_USER_SEARCH = LDAPSearch(
         config('LDAP_USER_DN'),
         ldap.SCOPE_SUBTREE,
-        config('LDAP_GROUP_FILTER', '(&(objectClass=inetOrgPerson)(cn=%(user)s))')
+        config('LDAP_USER_FILTER', default='(&(objectClass=inetOrgPerson)(cn=%(user)s))')
     )
 
     AUTH_LDAP_GROUP_SEARCH = LDAPSearch(
-        config('LDAP_GROUP_DN'),
+        config('LDAP_GROUP_DN', default=''),
         ldap.SCOPE_SUBTREE,
-        config('LDAP_GROUP_FILTER', '(objectClass=groupOfUniqueNames)')
+        config('LDAP_GROUP_FILTER', default='(objectClass=groupOfUniqueNames)')
     )
 
-    if config('LDAP_GROUP_TYPE', None) == 'groupOfUniqueNames':
+    if config('LDAP_GROUP_TYPE', default='') == 'groupOfUniqueNames':
         AUTH_LDAP_GROUP_TYPE = GroupOfUniqueNamesType()
 
-    AUTH_LDAP_REQUIRE_GROUP = config('LDAP_REQUIRE_GROUP', None)
+    AUTH_LDAP_REQUIRE_GROUP = config('LDAP_REQUIRE_GROUP', default=None)
+    AUTH_LDAP_DENY_GROUP = config('LDAP_DENY_GROUP', default=None)
+
     AUTH_LDAP_USER_ATTR_MAP = {
-        'first_name': config('LDAP_MAP_FIRST_NAME', 'givenName'),
-        'last_name': config('LDAP_MAP_LAST_NAME', 'sn'),
-        'email': config('LDAP_MAP_MAIL', 'mail')
+        'first_name': config('LDAP_MAP_FIRST_NAME', default='givenName'),
+        'last_name': config('LDAP_MAP_LAST_NAME', default='sn'),
+        'email': config('LDAP_MAP_MAIL', default='mail')
     }
 
-    AUTH_LDAP_USER_FLAGS_BY_GROUP = {
-        'is_active': config('LDAP_GROUP_ACTIVE', ''),
-        'is_staff': config('LDAP_GROUP_STAFF', ''),
-        'is_superuser': config('LDAP_GROUP_SUPERUSER', '')
-    }
+    ldap_is_active    = config('LDAP_GROUP_ACTIVE', default='')
+    ldap_is_superuser = config('LDAP_GROUP_SUPERUSER', default='')
+
+    if ldap_is_active or ldap_is_superuser:
+        AUTH_LDAP_USER_FLAGS_BY_GROUP = {
+            'is_active': ldap_is_active,
+            'is_superuser': ldap_is_superuser,
+        }
 
     AUTH_LDAP_FIND_GROUP_PERMS = config('LDAP_FIND_GROUP_PERMS', default=False, cast=bool)
+
+    # Cache group memberships for an hour to minimize LDAP traffic
+    AUTH_LDAP_CACHE_GROUPS = config('LDAP_CACHE_GROUPS', default=True, cast=bool)
+    AUTH_LDAP_GROUP_CACHE_TIMEOUT = config('LDAP_GROUP_CACHE_TIMEOUT', default=3600, cast=int)
 
     AUTHENTICATION_BACKENDS = AUTHENTICATION_BACKENDS + (
         'django_auth_ldap.backend.LDAPBackend',
     )
+
+    # setup logging for django_auth_ldap
+    import logging
+    logger = logging.getLogger('django_auth_ldap')
+    logger.addHandler(logging.StreamHandler())
+    ldap_loglevel = getattr(logging, config('LDAP_LOGLEVEL', default='DEBUG'))
+    logger.setLevel(ldap_loglevel)
