@@ -1,7 +1,7 @@
 import logging
 
 import ldap
-from django_auth_ldap.config import LDAPSearch, NestedGroupOfNamesType
+from django_auth_ldap.config import LDAPSearch, GroupOfUniqueNamesType
 
 # get all the configuration from the original image
 from sentry_docker_conf import *  # noqa
